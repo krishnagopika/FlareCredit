@@ -1,0 +1,53 @@
+{
+  "_format": "hh3-artifact-1",
+  "contractName": "IFlareCreditOracle",
+  "sourceName": "contracts/MockLending.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getScore",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "tradFiScore",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "onChainScore",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "combinedRiskScore",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxBorrowAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "recommendedAPR",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {},
+  "immutableReferences": {},
+  "inputSourceName": "project/contracts/MockLending.sol",
+  "buildInfoId": "solc-0_8_20-f1b47e412bd7d739301863c0fd9d826d9a762b2d"
+}
