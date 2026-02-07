@@ -1,0 +1,74 @@
+{
+  "0xcf78753Cb2A6f05D6795f32727B67362a2904070": {
+    "experian": {
+      "fico_score": 720,
+      "account_age_months": 84,
+      "payment_history_percent": 98.5,
+      "credit_utilization_percent": 23.0,
+      "total_accounts": 12,
+      "derogatory_marks": 0,
+      "total_debt": 15000
+    },
+    "plaid": {
+      "checking_balance": 8500.00,
+      "savings_balance": 25000.00,
+      "avg_monthly_income": 7500.00,
+      "avg_monthly_expenses": 5200.00,
+      "overdraft_count_6mo": 0
+    },
+    "payment_history": {
+      "on_time_payments_12mo": 12,
+      "late_payments_12mo": 0,
+      "missed_payments_12mo": 0,
+      "debt_to_income_ratio": 0.25
+    }
+  },
+  "0x1234567890123456789012345678901234567890": {
+    "experian": {
+      "fico_score": 650,
+      "account_age_months": 36,
+      "payment_history_percent": 85.0,
+      "credit_utilization_percent": 65.0,
+      "total_accounts": 5,
+      "derogatory_marks": 1,
+      "total_debt": 25000
+    },
+    "plaid": {
+      "checking_balance": 1200.00,
+      "savings_balance": 3000.00,
+      "avg_monthly_income": 4000.00,
+      "avg_monthly_expenses": 3800.00,
+      "overdraft_count_6mo": 2
+    },
+    "payment_history": {
+      "on_time_payments_12mo": 9,
+      "late_payments_12mo": 2,
+      "missed_payments_12mo": 1,
+      "debt_to_income_ratio": 0.62
+    }
+  },
+  "0x123456789012345678901234567890123456789": {
+    "experian": {
+      "fico_score": 580,
+      "account_age_months": 18,
+      "payment_history_percent": 72.0,
+      "credit_utilization_percent": 85.0,
+      "total_accounts": 3,
+      "derogatory_marks": 3,
+      "total_debt": 35000
+    },
+    "plaid": {
+      "checking_balance": 250.00,
+      "savings_balance": 0.00,
+      "avg_monthly_income": 2800.00,
+      "avg_monthly_expenses": 2900.00,
+      "overdraft_count_6mo": 5
+    },
+    "payment_history": {
+      "on_time_payments_12mo": 7,
+      "late_payments_12mo": 4,
+      "missed_payments_12mo": 1,
+      "debt_to_income_ratio": 1.25
+    }
+  }
+}
