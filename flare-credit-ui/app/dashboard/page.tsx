@@ -83,8 +83,9 @@ function CreditGauge({ score }: { score: number }) {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference * (1 - pct);
 
+  // Risk score: lower = better. <=30 green, 31-60 yellow (still approved), >60 red (denied)
   const color =
-    score >= 70 ? "#22c55e" : score >= 40 ? "#eab308" : "#ef4444";
+    score <= 30 ? "#22c55e" : score <= 60 ? "#eab308" : "#ef4444";
 
   return (
     <div className="relative flex items-center justify-center">

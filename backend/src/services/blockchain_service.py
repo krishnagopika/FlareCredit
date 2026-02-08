@@ -159,18 +159,18 @@ class BlockchainService:
                 score_data['valid_until']
             ).build_transaction({
                 'from': self.account.address,
-                'nonce': self.w3.eth.get_transaction_count(self.account.address),
+                'nonce': self.w3.eth.get_transaction_count(self.account.address, 'pending'),
                 'gas': 300000,
-                'gasPrice': self.w3.eth.gas_price
+                'gasPrice': int(self.w3.eth.gas_price * 1.2)
             })
-            
+
             signed = self.w3.eth.account.sign_transaction(txn, self.account.key)
             tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
-            
+
             print(f"Transaction sent: {tx_hash.hex()}")
             print(f"Waiting for confirmation...")
-            
-            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
             
             if receipt['status'] == 1:
                 print(f"Score submitted successfully!")
@@ -291,16 +291,16 @@ class BlockchainService:
         try:
             txn = self.lending.functions.disburseLoan(address, amount).build_transaction({
                 'from': self.account.address,
-                'nonce': self.w3.eth.get_transaction_count(self.account.address),
+                'nonce': self.w3.eth.get_transaction_count(self.account.address, 'pending'),
                 'gas': 500000,
-                'gasPrice': self.w3.eth.gas_price
+                'gasPrice': int(self.w3.eth.gas_price * 1.2)
             })
 
             signed = self.w3.eth.account.sign_transaction(txn, self.account.key)
             tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
             print(f"[Disburse] Tx sent: {tx_hash.hex()}")
 
-            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
 
             if receipt['status'] == 1:
                 print(f"[Disburse] Success! Gas: {receipt['gasUsed']}")
