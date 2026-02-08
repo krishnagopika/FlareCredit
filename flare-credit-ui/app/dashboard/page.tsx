@@ -4,7 +4,6 @@ import { useAccount, useBalance } from "wagmi";
 import { useEffect, useState } from "react";
 
 import {
-  getCreditScore,
   processCreditScore,
   getLoanStatus,
   evaluateLoan,
@@ -66,6 +65,7 @@ export default function Dashboard() {
   const [creditProcessing, setCreditProcessing] = useState(false);
   const [loanAmount, setLoanAmount] = useState("");
   const [evaluating, setEvaluating] = useState(false);
+  const [error, setError] = useState("");
 
   /* ---------- Wallet Balances ---------- */
 
@@ -95,24 +95,25 @@ export default function Dashboard() {
 
   /* ---------- Trigger Agents ---------- */
 
-  const handleRequestScore = async () => {
-    if (!address) return;
+ const handleRequestScore = async () => {
+  if (!address) return;
 
-    try {
-      setCreditProcessing(true);
+  try {
+    setCreditProcessing(true);
 
-      await processCreditScore(address);
+    // ✅ backend returns the score directly
+    const score = await processCreditScore(address);
 
-      // wait for agents to write on-chain
-      setTimeout(async () => {
-        const score = await getCreditScore(address);
-        setCredit(score);
-        setCreditProcessing(false);
-      }, 5000);
-    } catch {
-      setCreditProcessing(false);
-    }
-  };
+    // update UI instantly
+    setCredit(score);
+
+  } catch (err) {
+    console.error(err);
+    setError("Failed to generate credit score");
+  } finally {
+    setCreditProcessing(false);
+  }
+};
 
   /* ---------- Evaluate Loan ---------- */
 
