@@ -90,6 +90,9 @@ TradFi and On-Chain agents run **in parallel** via a LangGraph graph, then feed 
 | **Backend API** | [http://98.93.194.67:8000/docs](http://98.93.194.67:8000/docs) |
 | **Faucet API** | [http://98.93.194.67:8001/docs](http://98.93.194.67:8001/docs) |
 
+**Getting Test Tokens:**
+1. Use the Faucet API to mint mUSDC to your MetaMask account.
+2. To see your mUSDC balance in MetaMask, import the token using contract address: `0x45c7B48d002D014D0F8C8dff55045016AD28ACCB`
 ## Setup
 
 ### Prerequisites
