@@ -82,9 +82,9 @@ TradFi and On-Chain agents run **in parallel** via a LangGraph graph, then feed 
 
 | Service | URL |
 |---------|-----|
-| **Frontend** | [http://100.24.26.26:3000](http://100.24.26.26:3000) |
-| **Backend API** | [http://100.24.26.26:8000/docs](http://100.24.26.26:8000/docs) |
-| **Faucet API** | [http://100.24.26.26:8001/docs](http://100.24.26.26:8001/docs) |
+| **Frontend** | [http://98.93.194.67:3000](http://100.24.26.26:3000) |
+| **Backend API** | [http://98.93.194.67:8000/docs](http://100.24.26.26:8000/docs) |
+| **Faucet API** | [http://98.93.194.67:8001/docs](http://100.24.26.26:8001/docs) |
 
 ## Setup
 
