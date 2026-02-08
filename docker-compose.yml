@@ -1,0 +1,24 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+
+  faucet:
+    build: ./faucet
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./faucet/.env
+    restart: unless-stopped
+
+  frontend:
+    build: ./flare-credit-ui
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
