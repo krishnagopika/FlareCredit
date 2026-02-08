@@ -62,7 +62,7 @@ contract MockLending {
         ) = oracle.getScore(user);
 
         require(riskScore > 0, "No credit score on file");
-        require(riskScore <= 50, "Credit risk too high");
+        require(riskScore <= 60, "Credit risk too high");
         require(amount <= maxBorrowAmount, "Exceeds max borrow limit");
         require(!loans[user].active, "Already has active loan");
         require(token.balanceOf(address(this)) >= amount, "Lending pool insufficient");

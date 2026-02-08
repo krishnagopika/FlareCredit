@@ -262,78 +262,34 @@ class BlockchainService:
         
     def disburse_loan(self, user_address, amount_wei):
         """
-        Disburse loan in mUSDC to a user.
-        amount_wei: int, amount in wei (e.g., 500000000000000000000 for 500 tokens)
+        Disburse loan in mUSDC to a user via the MockLending contract.
+        The contract itself reads the oracle score and enforces:
+          - riskScore > 0
+          - riskScore <= 60
+          - amount <= maxBorrowAmount
+          - no active loan
+          - sufficient pool balance
         """
-        amount = amount_wei  # Already in wei, don't convert
-        amount_tokens = amount_wei / 10**18  # For display only
+        amount = amount_wei
+        amount_tokens = amount_wei / 10**18
+        address = Web3.to_checksum_address(user_address)
 
-        print(f"Disbursing loan: {amount_tokens} mUSDC to {user_address}")
+        print(f"[Disburse] {amount_tokens} mUSDC to {address}")
 
+        # Pre-flight: simulate the contract call to catch reverts early
         try:
-            # Debug: Check balances and allowances
-            pool_balance = self.token.functions.balanceOf(self.account.address).call()
-            print(f"Agent token balance: {pool_balance / 10**18} mUSDC")
-            
-            user_balance = self.token.functions.balanceOf(user_address).call()
-            print(f"User token balance: {user_balance / 10**18} mUSDC")
-            
-            lending_balance = self.token.functions.balanceOf(self.lending.address).call()
-            print(f"Lending contract balance: {lending_balance / 10**18} mUSDC")
-            
-            # Check if amount exceeds available balance
-            if amount > pool_balance:
-                error_msg = f"Insufficient pool balance. Available: {pool_balance / 10**18}, Requested: {amount_tokens}"
-                print(error_msg)
-                raise Exception(error_msg)
+            self.lending.functions.disburseLoan(address, amount).call(
+                {'from': self.account.address}
+            )
+            print("[Disburse] Pre-flight simulation passed")
+        except Exception as e:
+            reason = self._extract_revert_reason(e)
+            print(f"[Disburse] Pre-flight failed: {reason}")
+            raise Exception(reason)
 
-            # Approve lending contract if needed
-            allowance = self.token.functions.allowance(
-                self.account.address, 
-                self.lending.address
-            ).call()
-            
-            print(f"Current allowance: {allowance / 10**18} mUSDC")
-            
-            if allowance < amount:
-                print("Approving lending contract to spend mUSDC...")
-                approve_txn = self.token.functions.approve(
-                    self.lending.address,
-                    amount
-                ).build_transaction({
-                    'from': self.account.address,
-                    'nonce': self.w3.eth.get_transaction_count(self.account.address),
-                    'gas': 100000,
-                    'gasPrice': self.w3.eth.gas_price
-                })
-                signed_approve = self.w3.eth.account.sign_transaction(
-                    approve_txn, 
-                    self.account.key
-                )
-                tx_hash = self.w3.eth.send_raw_transaction(signed_approve.raw_transaction)
-                receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-                
-                if receipt['status'] != 1:
-                    raise Exception("Token approval failed")
-                    
-                print(f"Approved {amount_tokens} mUSDC for lending contract.")
-
-            # Try to call the function first to get revert reason
-            try:
-                self.lending.functions.disburseLoan(
-                    Web3.to_checksum_address(user_address),
-                    amount
-                ).call({'from': self.account.address})
-                print("Pre-flight check passed ✓")
-            except Exception as call_error:
-                print(f"Pre-flight check failed: {call_error}")
-                raise Exception(f"Contract will revert: {str(call_error)}")
-
-            # Call lending contract
-            txn = self.lending.functions.disburseLoan(
-                Web3.to_checksum_address(user_address),
-                amount
-            ).build_transaction({
+        # Build and send the actual transaction
+        try:
+            txn = self.lending.functions.disburseLoan(address, amount).build_transaction({
                 'from': self.account.address,
                 'nonce': self.w3.eth.get_transaction_count(self.account.address),
                 'gas': 500000,
@@ -342,35 +298,36 @@ class BlockchainService:
 
             signed = self.w3.eth.account.sign_transaction(txn, self.account.key)
             tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
-            print(f"Transaction sent: {tx_hash.hex()}")
-            print("Waiting for confirmation...")
+            print(f"[Disburse] Tx sent: {tx_hash.hex()}")
 
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
 
             if receipt['status'] == 1:
-                print(f"Loan disbursed successfully! Gas used: {receipt['gasUsed']}")
+                print(f"[Disburse] Success! Gas: {receipt['gasUsed']}")
+                return receipt
             else:
-                # Try to get revert reason
-                print(f"Transaction failed!")
-                print(f"Receipt: {receipt}")
-                
-                # Attempt to replay transaction to get revert reason
+                # Replay to get revert reason
+                reason = "Transaction reverted on-chain"
                 try:
-                    self.w3.eth.call({
-                        'to': self.lending.address,
-                        'from': self.account.address,
-                        'data': txn['data']
-                    }, receipt['blockNumber'])
-                except Exception as e:
-                    print(f"Revert reason: {e}")
-                
-                raise Exception("Transaction reverted on-chain")
-
-            return receipt
+                    self.w3.eth.call(
+                        {'to': self.lending.address, 'from': self.account.address, 'data': txn['data']},
+                        receipt['blockNumber']
+                    )
+                except Exception as replay_err:
+                    reason = self._extract_revert_reason(replay_err)
+                raise Exception(reason)
 
         except Exception as e:
-            print(f"Error disbursing loan: {e}")
+            print(f"[Disburse] Error: {e}")
             raise
+
+    def _extract_revert_reason(self, error):
+        """Extract human-readable revert reason from a web3 ContractLogicError."""
+        msg = str(error)
+        # web3.py returns 'execution reverted: <reason>'
+        if 'execution reverted:' in msg:
+            return msg.split('execution reverted:')[-1].strip().strip("'\"")
+        return msg
 
     def get_repayment_amount(self, user_address):
         """Get the total repayment amount including interest"""

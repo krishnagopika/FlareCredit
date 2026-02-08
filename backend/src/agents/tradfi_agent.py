@@ -1,21 +1,19 @@
 import json
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_aws import ChatBedrockConverse
 from langchain_core.messages import HumanMessage, SystemMessage
 from src.utils.config import Config
 
 
 class TradFiAgent:
-    """Fetches traditional finance credit data via Flare FDC and scores with Gemini"""
+    """Fetches traditional finance credit data via Flare FDC and scores with Claude"""
 
     def __init__(self, fdc_service):
         self.fdc = fdc_service
-        self.llm = None
-        if Config.GEMINI_API_KEY:
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
-                google_api_key=Config.GEMINI_API_KEY,
-                temperature=0.1,
-            )
+        self.llm = ChatBedrockConverse(
+            model=Config.BEDROCK_MODEL_ID,
+            region_name=Config.AWS_REGION,
+            temperature=0.1,
+        )
 
     def fetch_data(self, state):
         """Fetch credit data for a user through FDC-validated external source"""
@@ -38,7 +36,7 @@ class TradFiAgent:
         state['plaid_data'] = data['plaid']
         state['payment_data'] = data['payment_history']
 
-        # Calculate TradFi score via Gemini or fallback
+        # Calculate TradFi score via LLM or fallback
         state['tradfi_score'] = self._score_with_llm(state)
 
         print(f"  FICO: {state['experian_data']['fico_score']}")
@@ -78,11 +76,7 @@ class TradFiAgent:
         }
 
     def _score_with_llm(self, state):
-        """Use Gemini to score credit data, with rule-based fallback"""
-        if not self.llm:
-            print("  [TradFi] No Gemini API key, using rule-based scoring")
-            return self._calculate_score(state)
-
+        """Use Claude to score credit data, with rule-based fallback"""
         try:
             exp = state['experian_data']
             plaid = state['plaid_data']
@@ -111,11 +105,11 @@ class TradFiAgent:
             score = int(result['tradfi_score'])
             score = max(0, min(1000, score))
 
-            print(f"  [TradFi] Gemini reasoning: {result.get('reasoning', 'N/A')}")
+            print(f"  [TradFi] Claude reasoning: {result.get('reasoning', 'N/A')}")
             return score
 
         except Exception as e:
-            print(f"  [TradFi] Gemini call failed ({e}), falling back to rule-based scoring")
+            print(f"  [TradFi] LLM call failed ({e}), falling back to rule-based scoring")
             return self._calculate_score(state)
 
     def _calculate_score(self, state):

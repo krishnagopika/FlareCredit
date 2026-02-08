@@ -15,7 +15,7 @@ export interface FlareCreditOracle$Type {
   readonly deployedLinkReferences: {};
   readonly immutableReferences: {};
   readonly inputSourceName: "project/contracts/FlareCreditOracle.sol";
-  readonly buildInfoId: "solc-0_8_20-f1b47e412bd7d739301863c0fd9d826d9a762b2d";
+  readonly buildInfoId: "solc-0_8_20-8bfe6d56d879f4bc07f189196ad39dbdcb9be8f9";
 };
 
 import "hardhat/types/artifacts";

@@ -1,21 +1,19 @@
 import json
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_aws import ChatBedrockConverse
 from langchain_core.messages import HumanMessage, SystemMessage
 from src.utils.config import Config
 
 
 class OnChainAgent:
-    """Analyzes on-chain blockchain behavior and scores with Gemini"""
+    """Analyzes on-chain blockchain behavior and scores with Claude"""
 
     def __init__(self, blockchain_service):
         self.blockchain = blockchain_service
-        self.llm = None
-        if Config.GEMINI_API_KEY:
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
-                google_api_key=Config.GEMINI_API_KEY,
-                temperature=0.1,
-            )
+        self.llm = ChatBedrockConverse(
+            model=Config.BEDROCK_MODEL_ID,
+            region_name=Config.AWS_REGION,
+            temperature=0.1,
+        )
 
     def analyze(self, state):
         """Analyze wallet's on-chain reputation"""
@@ -44,7 +42,7 @@ class OnChainAgent:
         state['wallet_age_days'] = self._estimate_wallet_age(user_address, data['transaction_count'])
         state['is_active_user'] = data['transaction_count'] > 0
 
-        # Calculate on-chain score via Gemini or fallback
+        # Calculate on-chain score via LLM or fallback
         state['onchain_score'] = self._score_with_llm(state)
 
         print(f"  Balance: {state['balance_eth']:.4f} FLR")
@@ -62,11 +60,7 @@ class OnChainAgent:
         return estimated_days
 
     def _score_with_llm(self, state):
-        """Use Gemini to score on-chain data, with rule-based fallback"""
-        if not self.llm:
-            print("  [OnChain] No Gemini API key, using rule-based scoring")
-            return self._calculate_score(state)
-
+        """Use Claude to score on-chain data, with rule-based fallback"""
         try:
             wallet_data = {
                 "balance_flr": round(state['balance_eth'], 4),
@@ -96,11 +90,11 @@ class OnChainAgent:
             score = int(result['onchain_score'])
             score = max(0, min(100, score))
 
-            print(f"  [OnChain] Gemini reasoning: {result.get('reasoning', 'N/A')}")
+            print(f"  [OnChain] Claude reasoning: {result.get('reasoning', 'N/A')}")
             return score
 
         except Exception as e:
-            print(f"  [OnChain] Gemini call failed ({e}), falling back to rule-based scoring")
+            print(f"  [OnChain] LLM call failed ({e}), falling back to rule-based scoring")
             return self._calculate_score(state)
 
     def _calculate_score(self, state):

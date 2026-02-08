@@ -26,7 +26,7 @@ class Config:
     )
     FDC_DATA_API_URL = os.getenv(
         'FDC_DATA_API_URL',
-        'https://flare-credit-mock-api.vercel.app/api/credit-data'
+        'http://localhost:8000/api/credit-data'
     )
     FDC_HUB_ADDRESS = os.getenv(
         'FDC_HUB_ADDRESS',
@@ -50,8 +50,14 @@ class Config:
     FTSO_FEED_FLR_USD = '0x01464c522f55534400000000000000000000000000'
     FTSO_FEED_XRP_USD = '0x015852502f55534400000000000000000000000000'
 
-    # Gemini
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    # AWS Bedrock
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+    BEDROCK_MODEL_ID = os.getenv(
+        'BEDROCK_MODEL_ID',
+        'global.anthropic.claude-sonnet-4-5-20250929-v1:0'
+    )
 
     # Paths
     ORACLE_ABI_PATH = 'src/contracts/oracle_abi.json'

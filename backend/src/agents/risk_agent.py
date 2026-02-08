@@ -1,25 +1,23 @@
 import json
 import time
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_aws import ChatBedrockConverse
 from langchain_core.messages import HumanMessage, SystemMessage
 from src.utils.config import Config
 
 
 class RiskAgent:
-    """Combines TradFi + OnChain into risk assessment using Gemini"""
+    """Combines TradFi + OnChain into risk assessment using Claude"""
 
     def __init__(self, blockchain_service=None):
         self.blockchain_service = blockchain_service
-        self.llm = None
-        if Config.GEMINI_API_KEY:
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
-                google_api_key=Config.GEMINI_API_KEY,
-                temperature=0.1,
-            )
+        self.llm = ChatBedrockConverse(
+            model=Config.BEDROCK_MODEL_ID,
+            region_name=Config.AWS_REGION,
+            temperature=0.1,
+        )
 
     def calculate_risk(self, state):
-        """Calculate final risk metrics via Gemini or fallback"""
+        """Calculate final risk metrics via Claude or fallback"""
 
         print("Risk Agent: Calculating risk scores...")
 
@@ -88,11 +86,7 @@ class RiskAgent:
             print(f"  [Risk] Flare RNG call failed ({e}), skipping jitter")
 
     def _assess_with_llm(self, state):
-        """Use Gemini for risk assessment, returns dict or None on failure"""
-        if not self.llm:
-            print("  [Risk] No Gemini API key, using rule-based scoring")
-            return None
-
+        """Use Claude for risk assessment, returns dict or None on failure"""
         try:
             requested_amount = state.get('requested_amount', 0)
             input_data = {
@@ -134,7 +128,7 @@ class RiskAgent:
             max_borrow_tokens = max(1000, min(50000, int(result['max_borrow_amount_tokens'])))
             apr = max(300, min(600, int(result['apr_basis_points'])))
 
-            print(f"  [Risk] Gemini reasoning: {result.get('reasoning', 'N/A')}")
+            print(f"  [Risk] Claude reasoning: {result.get('reasoning', 'N/A')}")
 
             return {
                 'combined_risk_score': combined_risk,
@@ -143,7 +137,7 @@ class RiskAgent:
             }
 
         except Exception as e:
-            print(f"  [Risk] Gemini call failed ({e}), falling back to rule-based scoring")
+            print(f"  [Risk] LLM call failed ({e}), falling back to rule-based scoring")
             return None
 
     def _calculate_rule_based(self, state):

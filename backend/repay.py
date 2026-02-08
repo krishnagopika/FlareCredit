@@ -38,7 +38,7 @@ print(f"Approve tx confirmed: {receipt1['status'] == 1}")
 # Transaction 2: Repay
 print("\n=== STEP 2: Repaying loan ===")
 tx2 = {
-    'to': Web3.to_checksum_address("0x2860E5aCd371978b8Aa3C6a6a4aC0986B27443f8"),
+    'to': Web3.to_checksum_address("0x9feF5655Ad38c61E6F662c5aED8174dcde2fd788"),
     'data': "0x402d8883",
     'value': 0,
     'gas': int("0x493e0", 16),

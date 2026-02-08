@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import threading
 from contextlib import asynccontextmanager
 
+from concurrent.futures import ThreadPoolExecutor
 from src.services.blockchain_service import BlockchainService
 from src.services.fdc_service import FlareFDCService
 from src.agents.tradfi_agent import TradFiAgent
@@ -34,8 +35,15 @@ def process_credit_request(user_address: str, requested_amount: int = 0):
     }
 
     try:
-        state = tradfi_agent.fetch_data(state)
-        state = onchain_agent.analyze(state)
+        # TradFi and OnChain are independent — run in parallel
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            tradfi_future = executor.submit(tradfi_agent.fetch_data, dict(state))
+            onchain_future = executor.submit(onchain_agent.analyze, dict(state))
+            tradfi_state = tradfi_future.result()
+            onchain_state = onchain_future.result()
+        state.update(tradfi_state)
+        state.update(onchain_state)
+
         state = risk_agent.calculate_risk(state)
         state = submission_agent.submit(state)
 

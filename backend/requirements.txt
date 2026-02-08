@@ -5,5 +5,5 @@ pydantic
 requests
 web3
 python-dotenv
-langgraph
-langchain-google-genai
+langchain-aws
+boto3
