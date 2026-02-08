@@ -44,7 +44,7 @@ export default function Landing() {
         animate="visible"
         custom={1}
       >
-        Unlock uncollateral loans using verifiable credit data.
+        Unlock uncollateralized loans using verifiable credit data.
       </motion.p>
 
       <motion.div

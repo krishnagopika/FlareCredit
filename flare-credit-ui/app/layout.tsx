@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "FlareCredit - Decentralized Credit Oracle",
   description:
-    "Unlock uncollateral loans using verifiable credit data on Flare Network.",
+    "Unlock uncollateralized loans using verifiable credit data on Flare Network.",
 };
 
 export default function RootLayout({

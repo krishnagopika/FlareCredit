@@ -393,7 +393,7 @@ export default function Dashboard() {
               <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider">
-                    Gas Balance
+                    Native Balance
                   </p>
                   <p className="text-lg font-semibold text-white mt-1">
                     {gasLoading
@@ -403,7 +403,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider">
-                    Stable Balance
+                    Token Balance
                   </p>
                   <p className="text-lg font-semibold text-white mt-1">
                     {musdcLoading
@@ -476,7 +476,7 @@ export default function Dashboard() {
                 <div className="glass rounded-xl p-6 text-center space-y-2">
                   <p className="text-slate-400">No active loans found.</p>
                   <p className="text-slate-500 text-sm">
-                    Request a credit score below to unlock borrowing power.
+                    Analyze your credit score below to unlock borrowing power.
                   </p>
                 </div>
               )}
@@ -486,7 +486,7 @@ export default function Dashboard() {
                   {/* Summary row */}
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <p className="text-xs text-slate-500 uppercase tracking-wider">Borrowed</p>
+                      <p className="text-xs text-slate-500 uppercase tracking-wider">Principal</p>
                       <p className="text-lg font-semibold text-white mt-1">
                         {loan.amount_tokens} mUSDC
                       </p>
@@ -498,7 +498,7 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 uppercase tracking-wider">Since</p>
+                      <p className="text-xs text-slate-500 uppercase tracking-wider">Borrowed On</p>
                       <p className="text-lg font-semibold text-white mt-1">
                         {new Date(loan.borrowed_at * 1000).toLocaleDateString()}
                       </p>
@@ -560,7 +560,7 @@ export default function Dashboard() {
                                   animate={{ opacity: 1, y: 0 }}
                                 >
                                   <p className="text-green-400 font-semibold">
-                                    Loan settled successfully!
+                                    Loan repaid successfully!
                                   </p>
                                 </motion.div>
                               )}
@@ -599,7 +599,7 @@ export default function Dashboard() {
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                                       </svg>
-                                      Approving tokens...
+                                      Approving token spend...
                                     </span>
                                   ) : settleStep === "repaying" ? (
                                     <span className="flex items-center justify-center gap-2">
@@ -612,7 +612,7 @@ export default function Dashboard() {
                                   ) : !repaymentInfo.user_status.has_sufficient_balance ? (
                                     "Insufficient Balance"
                                   ) : (
-                                    `Settle Loan - ${Number(repaymentInfo.repayment.total_amount).toFixed(4)} mUSDC`
+                                    `Repay Loan — ${Number(repaymentInfo.repayment.total_amount).toFixed(4)} mUSDC`
                                   )}
                                 </motion.button>
                               )}
@@ -644,7 +644,7 @@ export default function Dashboard() {
                     Credit Intelligence
                   </h2>
                   <p className="text-slate-400 text-sm">
-                    Agent-verified borrowing power
+                    AI-verified credit profile
                   </p>
                 </div>
 
@@ -684,10 +684,10 @@ export default function Dashboard() {
                           d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
                         />
                       </svg>
-                      Running credit agents...
+                      Analyzing credit profile...
                     </span>
                   ) : (
-                    "Request Credit Score"
+                    "Analyze Credit Score"
                   )}
                 </motion.button>
               ) : (
@@ -754,14 +754,14 @@ export default function Dashboard() {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      Apply For Loan
+                      Apply for Loan
                     </motion.button>
                   </DialogTrigger>
 
                   <DialogContent className="sm:max-w-xl">
                     <DialogHeader>
                       <DialogTitle className="text-white text-xl">
-                        {evalResult ? "Loan Evaluation" : "Request Loan"}
+                        {evalResult ? "Eligibility Result" : "Loan Application"}
                       </DialogTitle>
                     </DialogHeader>
 
@@ -818,7 +818,7 @@ export default function Dashboard() {
                               Evaluating...
                             </span>
                           ) : (
-                            "Evaluate Loan"
+                            "Check Eligibility"
                           )}
                         </button>
                       </div>
@@ -841,7 +841,7 @@ export default function Dashboard() {
                           <p className={`text-lg font-semibold ${
                             evalResult.approved ? "text-green-400" : "text-red-400"
                           }`}>
-                            {evalResult.approved ? "Loan Approved" : "Loan Rejected"}
+                            {evalResult.approved ? "Loan Approved" : "Loan Denied"}
                           </p>
                         </div>
 
@@ -907,10 +907,10 @@ export default function Dashboard() {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                                   </svg>
-                                  Disbursing...
+                                  Processing disbursement...
                                 </span>
                               ) : (
-                                "Proceed with Loan"
+                                "Confirm Disbursement"
                               )}
                             </motion.button>
                           )}
@@ -934,7 +934,7 @@ export default function Dashboard() {
                           <p className={`text-lg font-semibold ${
                             disburseResult.success ? "text-green-400" : "text-red-400"
                           }`}>
-                            {disburseResult.success ? "Loan Disbursed!" : "Disbursement Failed"}
+                            {disburseResult.success ? "Loan Disbursed Successfully" : "Disbursement Failed"}
                           </p>
                           <p className="text-sm text-slate-400 mt-1">{disburseResult.message}</p>
                         </div>
