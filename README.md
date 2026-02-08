@@ -8,7 +8,7 @@ Uncollateralized DeFi lending powered by AI credit scoring and Flare's native da
 
 **Integrations:**
 
-- **Flare Data Connector (FDC)** — Fetches and attests external TradFi credit data (simulated Experian/Plaid) via JsonApi attestation. The TradFi agent uses FDC to bring off-chain credit information on-chain with cryptographic integrity proofs.
+- **Flare Data Connector (FDC)** — Fetches and attests external TradFi data via JsonApi attestation. Credit scores from bureaus (simulated Experian/TransUnion) and bank account data from aggregators (simulated Plaid) are brought on-chain with cryptographic integrity proofs.
 - **Flare Time Series Oracle (FTSO v2)** — Live FLR/USD and XRP/USD price feeds for real-time USD valuation of wallet balances and loan amounts. Used during on-chain scoring and loan evaluation.
 - **Flare Secure Random Number Generator (RandomNumberV2)** — Adds verifiable randomness jitter to credit scores, preventing deterministic gaming of the scoring algorithm.
 
@@ -71,7 +71,7 @@ The backend runs a LangGraph-orchestrated multi-agent system powered by Claude (
 
 | Agent | Role | Data Source |
 |-------|------|-------------|
-| **TradFi Agent** | Scores traditional credit factors (FICO, payment history, utilization, debt-to-income) | External API via Flare FDC |
+| **TradFi Agent** | Scores traditional credit factors (FICO from credit bureaus, account balances and payment history from Plaid, utilization, debt-to-income) | External APIs via Flare FDC |
 | **On-Chain Agent** | Analyzes wallet age, transaction count, and native balance (USD-valued via FTSO) | Flare RPC + FTSO v2 |
 | **Risk Agent** | Merges both scores into a combined risk profile, computes max borrow and APR, applies RNG jitter | Claude (Bedrock) + RandomNumberV2 |
 | **Submission Agent** | Writes the final credit score on-chain to FlareCreditOracle | Flare smart contract tx |
