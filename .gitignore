@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -247,3 +247,5 @@ next-env.d.ts
 .claude
 
 .venv
+
+*.pem
