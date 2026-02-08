@@ -2,9 +2,12 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 # Request Models
-class CreditScoreRequest(BaseModel):
+class ScoreRequest(BaseModel):
     user_address: str
-    requested_amount: Optional[float] = 0  # Amount in tokens (e.g., 500.0)
+
+class EvaluateLoanRequest(BaseModel):
+    user_address: str
+    requested_amount: float  # Amount in tokens (e.g., 500.0)
 
 class DisburseRequest(BaseModel):
     user_address: str
@@ -16,9 +19,10 @@ class CreditScoreResponse(BaseModel):
     onchain_score: int
     combined_risk_score: int
     max_borrow_amount: str
-    requested_amount: Optional[str] = None
-    approved_amount: Optional[str] = None
     apr: float
+    rng_jitter: Optional[int] = None
+    flr_price_usd: Optional[float] = None
+    xrp_price_usd: Optional[float] = None
     tx_hash: Optional[str] = None
 
 class LoanStatusResponse(BaseModel):
@@ -70,3 +74,7 @@ class EvaluateLoanResponse(BaseModel):
     base_apr: Optional[float] = None
     adjusted_apr: Optional[float] = None
     utilization_premium: Optional[float] = None
+    loan_value_usd: Optional[float] = None
+    flr_price_usd: Optional[float] = None
+    xrp_price_usd: Optional[float] = None
+    tx_hash: Optional[str] = None

@@ -13,15 +13,18 @@ w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 user = w3.eth.account.from_key(USER_PRIVATE_KEY)
 print(f"Repaying from: {user.address}")
 
+# Get the latest nonce for the user
+nonce = w3.eth.get_transaction_count(user.address)
+
 # Transaction 1: Approve
 print("\n=== STEP 1: Approving tokens ===")
 tx1 = {
     'to': Web3.to_checksum_address("0x45c7B48d002D014D0F8C8dff55045016AD28ACCB"),
-    'data': "0x095ea7b30000000000000000000000002860e5acd371978b8aa3c6a6a4ac0986b27443f800000000000000000000000000000000000000000000000000000000000001f4",
+    'data': "0x095ea7b30000000000000000000000002860e5acd371978b8aa3c6a6a4ac0986b27443f800000000000000000000000000000000000000000000001b1ae8f85ab3ae935a",
     'value': 0,
     'gas': int("0x186a0", 16),
     'gasPrice': int("0x5d21dba01", 16),
-    'nonce': 0,
+    'nonce': nonce,
     'chainId': 114
 }
 
@@ -40,7 +43,7 @@ tx2 = {
     'value': 0,
     'gas': int("0x493e0", 16),
     'gasPrice': int("0x5d21dba01", 16),
-    'nonce': 1,
+    'nonce': nonce + 1,  # Increment nonce
     'chainId': 114
 }
 

@@ -4,30 +4,100 @@ import json
 import time
 from src.utils.config import Config
 
+RANDOM_NUMBER_V2_ABI = [
+    {
+        "inputs": [],
+        "name": "getRandomNumber",
+        "outputs": [
+            {"internalType": "uint256", "name": "randomNumber", "type": "uint256"},
+            {"internalType": "bool", "name": "isSecure", "type": "bool"},
+            {"internalType": "uint256", "name": "timestamp", "type": "uint256"}
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    }
+]
+
+FTSO_V2_ABI = [
+    {
+        "inputs": [
+            {"internalType": "bytes21[]", "name": "_feedIds", "type": "bytes21[]"}
+        ],
+        "name": "getFeedsById",
+        "outputs": [
+            {"internalType": "uint256[]", "name": "_values", "type": "uint256[]"},
+            {"internalType": "int8[]", "name": "_decimals", "type": "int8[]"},
+            {"internalType": "uint64", "name": "_timestamp", "type": "uint64"}
+        ],
+        "stateMutability": "payable",
+        "type": "function"
+    }
+]
+
 class BlockchainService:
     def __init__(self):
         # Connect to Flare
         self.w3 = Web3(Web3.HTTPProvider(Config.RPC_URL))
-        
+
         # Inject POA middleware for Flare (updated for web3.py v7+)
         self.w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-        
+
         # Setup agent account
         self.account = self.w3.eth.account.from_key(Config.PRIVATE_KEY)
-        
+
         # Load contracts
         self.oracle = self._load_contract(Config.ORACLE_ABI_PATH, Config.ORACLE_ADDRESS)
         self.lending = self._load_contract(Config.LENDING_ABI_PATH, Config.LENDING_ADDRESS)
         self.token = self._load_contract(Config.TOKEN_ABI_PATH, Config.TOKEN_ADDRESS)
-        
+
+        # Load RandomNumberV2 contract
+        self.random_number_v2 = self.w3.eth.contract(
+            address=Web3.to_checksum_address(Config.RANDOM_NUMBER_V2_ADDRESS),
+            abi=RANDOM_NUMBER_V2_ABI
+        )
+
+        # Load FtsoV2 contract (price feeds)
+        self.ftso_v2 = self.w3.eth.contract(
+            address=Web3.to_checksum_address(Config.FTSO_V2_ADDRESS),
+            abi=FTSO_V2_ABI
+        )
+
         # Verify connection
         if not self.w3.is_connected():
             raise Exception("Failed to connect to blockchain")
-        
+
         print(f"Agent account: {self.account.address}")
         print(f"Connected to Flare Coston2")
         print(f"Oracle: {Config.ORACLE_ADDRESS}")
     
+    def get_secure_random(self):
+        """Call RandomNumberV2.getRandomNumber() — free view call, no gas"""
+        result = self.random_number_v2.functions.getRandomNumber().call()
+        return {
+            'random_number': result[0],
+            'is_secure': result[1],
+            'timestamp': result[2]
+        }
+
+    def get_ftso_prices(self):
+        """Call FtsoV2.getFeedsById() for FLR/USD and XRP/USD — free view call"""
+        try:
+            feed_ids = [
+                bytes.fromhex(Config.FTSO_FEED_FLR_USD[2:]),
+                bytes.fromhex(Config.FTSO_FEED_XRP_USD[2:]),
+            ]
+            values, decimals, timestamp = self.ftso_v2.functions.getFeedsById(feed_ids).call()
+            flr_usd = values[0] / (10 ** decimals[0])
+            xrp_usd = values[1] / (10 ** decimals[1])
+            return {
+                'flr_usd': flr_usd,
+                'xrp_usd': xrp_usd,
+                'timestamp': timestamp,
+            }
+        except Exception as e:
+            print(f"[FTSO] Failed to fetch prices: {e}")
+            return None
+
     def _load_contract(self, abi_path, address):
         """Load contract from ABI file"""
         with open(abi_path) as f:
