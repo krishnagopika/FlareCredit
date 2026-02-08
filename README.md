@@ -78,6 +78,10 @@ The backend runs a LangGraph-orchestrated multi-agent system powered by Claude (
 
 TradFi and On-Chain agents run **in parallel** via a LangGraph graph, then feed into the sequential Risk and Submission agents. Each agent uses Claude Sonnet on AWS Bedrock for reasoning — interpreting raw data, weighing risk factors, and generating human-readable explanations for loan approvals.
 
+## demo - recording
+
+[recording](https://drive.google.com/file/d/1ye9MlVsAFXFMHBCOjoh5-YYZI0BCQeNT/view?usp=drive_link)
+
 ## Live Demo
 
 | Service | URL |
