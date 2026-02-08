@@ -1,13 +1,12 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from typing import Optional
+from fastapi import APIRouter, HTTPException
+from src.utils.config import Config
 from src.schemas.schemas import (
-    CreditScoreRequest,
+    ScoreRequest,
+    EvaluateLoanRequest,
     CreditScoreResponse,
     DisburseRequest,
     LoanStatusResponse,
     RepaymentInfoResponse,
-    PrepareRepaymentResponse,
-    TransactionData,
     HealthResponse,
     EvaluateLoanResponse
 )
@@ -20,36 +19,6 @@ tradfi_agent = None
 onchain_agent = None
 risk_agent = None
 submission_agent = None
-
-def process_credit_request_background(user_address: str, requested_amount: int = 0):
-    """Background task to process credit score"""
-    
-    print(f"\nProcessing credit score for: {user_address}")
-    if requested_amount > 0:
-        print(f"Requested loan amount: {requested_amount / 10**18:.0f} tokens")
-    print(f"{'='*60}\n")
-    
-    state = {
-        'user_address': user_address,
-        'requested_amount': requested_amount
-    }
-    
-    try:
-        # Run through agents
-        state = tradfi_agent.fetch_data(state)
-        state = onchain_agent.analyze(state)
-        state = risk_agent.calculate_risk(state)
-        state = submission_agent.submit(state)
-        
-        print(f"\n{'='*60}")
-        print("COMPLETED")
-        print(f"Transaction: {state['tx_hash']}")
-        print(f"{'='*60}\n")
-        
-    except Exception as e:
-        print(f"Error processing request: {e}")
-        import traceback
-        traceback.print_exc()
 
 # ============================================================================
 # HEALTH & INFO & DEBUG
@@ -64,135 +33,207 @@ async def health_check():
         "agent_address": blockchain_service.account.address
     }
 
-@router.get("/onchain-data/{user_address}")
-async def get_onchain_data(user_address: str):
-    """Get raw on-chain data for a user"""
-    try:
-        data = blockchain_service.get_onchain_data(user_address)
-        return data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/debug/contract-functions")
-async def get_contract_functions():
-    """List all available functions in the lending contract"""
-    
-    functions = []
-    for item in blockchain_service.lending.abi:
-        if item.get('type') == 'function':
-            functions.append({
-                'name': item['name'],
-                'inputs': [
-                    {
-                        'name': inp.get('name', ''),
-                        'type': inp.get('type', '')
-                    } 
-                    for inp in item.get('inputs', [])
-                ],
-                'outputs': [
-                    {
-                        'name': out.get('name', ''),
-                        'type': out.get('type', '')
-                    } 
-                    for out in item.get('outputs', [])
-                ],
-                'stateMutability': item.get('stateMutability', '')
-            })
-    
-    return {
-        "lending_contract": blockchain_service.lending.address,
-        "total_functions": len(functions),
-        "functions": sorted(functions, key=lambda x: x['name'])
-    }
-
 # ============================================================================
 # CREDIT SCORING
 # ============================================================================
 
-@router.post("/process-score", response_model=dict)
-async def trigger_score_processing(
-    request: CreditScoreRequest,
-    background_tasks: BackgroundTasks
-):
-    """
-    Manually trigger credit score processing for a user.
-    Optionally include requested loan amount for APR adjustment.
-    """
-    # Convert tokens to wei
-    requested_wei = int(request.requested_amount * 10**18) if request.requested_amount > 0 else 0
-    
-    background_tasks.add_task(
-        process_credit_request_background,
-        request.user_address,
-        requested_wei
-    )
-    
-    return {
-        "message": "Credit score processing started",
-        "user_address": request.user_address,
-        "requested_amount": request.requested_amount
+def _run_scoring_pipeline(user_address: str, requested_amount_wei: int = 0):
+    """Shared pipeline: TradFi → OnChain → Risk → Submission. Returns state dict."""
+    state = {
+        'user_address': user_address,
+        'requested_amount': requested_amount_wei,
     }
+    state = tradfi_agent.fetch_data(state)
+    state = onchain_agent.analyze(state)
+    state = risk_agent.calculate_risk(state)
+    state = submission_agent.submit(state)
+    return state
 
-@router.get("/score/{user_address}", response_model=CreditScoreResponse)
-async def get_credit_score(user_address: str):
-    """Get existing credit score for a user from blockchain"""
-    
-    score = blockchain_service.get_user_score(user_address)
-    
-    if not score or score['combined_risk_score'] == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="No credit score found for this address"
-        )
-    
+
+@router.post("/process-score", response_model=CreditScoreResponse)
+async def process_score(request: ScoreRequest):
+    """
+    Run the credit scoring pipeline for a user and return their profile.
+    No loan amount needed — just scores, FTSO prices, and on-chain submission.
+    """
+    try:
+        state = _run_scoring_pipeline(request.user_address)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Scoring pipeline failed: {e}")
+
     return CreditScoreResponse(
-        tradfi_score=score['tradfi_score'],
-        onchain_score=score['onchain_score'],
-        combined_risk_score=score['combined_risk_score'],
-        max_borrow_amount=str(score['max_borrow_amount']),
-        apr=score['apr'] / 100
+        tradfi_score=state['tradfi_score'],
+        onchain_score=state['onchain_score'],
+        combined_risk_score=state['combined_risk_score'],
+        max_borrow_amount=str(state['max_borrow_amount']),
+        apr=state['apr'] / 100,
+        rng_jitter=state.get('rng_jitter'),
+        flr_price_usd=state.get('flr_price_usd'),
+        xrp_price_usd=state.get('xrp_price_usd'),
+        tx_hash=state.get('tx_hash'),
     )
+
 
 @router.post("/evaluate-loan", response_model=EvaluateLoanResponse)
-async def evaluate_loan_request(request: CreditScoreRequest):
+async def evaluate_loan(request: EvaluateLoanRequest):
     """
-    Evaluate a specific loan amount against user's credit score.
-    Returns whether approved and adjusted APR.
+    Fast loan eligibility preview with agentic reasoning.
+    Reads cached on-chain score + fresh balance check via RPC.
+    Returns approved/denied with Gemini-generated explanation.
     """
-    score = blockchain_service.get_user_score(request.user_address)
-    
-    if not score or score['combined_risk_score'] == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="No credit score found. Please request a credit score first."
+    address = request.user_address
+    requested_wei = int(request.requested_amount * 10**18)
+
+    if request.requested_amount <= 0:
+        return EvaluateLoanResponse(
+            approved=False,
+            reason="Requested amount must be greater than 0.",
+            max_borrow_amount="0",
         )
-    
+
+    # 1. Check active loan
+    has_loan = blockchain_service.check_active_loan(address)
+    if has_loan:
+        return EvaluateLoanResponse(
+            approved=False,
+            reason="User already has an active loan. Repay the existing loan before borrowing again.",
+            max_borrow_amount="0",
+            requested_amount=str(requested_wei),
+        )
+
+    # 2. Read cached on-chain score (from process-score)
+    score = blockchain_service.get_user_score(address)
+    if not score or score['combined_risk_score'] == 0:
+        return EvaluateLoanResponse(
+            approved=False,
+            reason="No credit score found. Run /process-score first.",
+            max_borrow_amount="0",
+            requested_amount=str(requested_wei),
+        )
+
     max_borrow = score['max_borrow_amount']
     base_apr = score['apr']
-    requested_wei = int(request.requested_amount * 10**18)
-    
+    risk = score['combined_risk_score']
+
+    # 3. Fetch live FTSO prices for USD valuation
+    ftso = blockchain_service.get_ftso_prices()
+    flr_price = ftso['flr_usd'] if ftso else None
+    xrp_price = ftso['xrp_usd'] if ftso else None
+    loan_value_usd = (requested_wei / 10**18) * xrp_price if xrp_price else None
+
+    # 4. Check risk ceiling
+    MAX_ACCEPTABLE_RISK = 70
+    if risk > MAX_ACCEPTABLE_RISK:
+        return EvaluateLoanResponse(
+            approved=False,
+            reason=f"Credit risk score {risk}/100 exceeds the maximum acceptable threshold of {MAX_ACCEPTABLE_RISK}.",
+            max_borrow_amount=str(max_borrow),
+            requested_amount=str(requested_wei),
+        )
+
+    # 5. Check amount limit
     if requested_wei > max_borrow:
-        return {
-            "approved": False,
-            "reason": "Requested amount exceeds maximum borrowing limit",
-            "max_borrow_amount": str(max_borrow),
-            "requested_amount": str(requested_wei)
-        }
-    
-    # Calculate utilization-adjusted APR
+        return EvaluateLoanResponse(
+            approved=False,
+            reason=f"Requested {request.requested_amount:.0f} tokens exceeds max borrowing limit of {max_borrow / 10**18:.0f} tokens.",
+            max_borrow_amount=str(max_borrow),
+            requested_amount=str(requested_wei),
+        )
+
+    # 6. Check pool liquidity
+    pool = blockchain_service.get_pool_balance()
+    if pool and pool['balance_wei'] < requested_wei:
+        return EvaluateLoanResponse(
+            approved=False,
+            reason=f"Insufficient pool liquidity. Available: {pool['balance_tokens']:.0f} tokens.",
+            max_borrow_amount=str(max_borrow),
+            requested_amount=str(requested_wei),
+        )
+
+    # 7. Calculate utilization-adjusted APR
     utilization = requested_wei / max_borrow if max_borrow > 0 else 0
-    utilization_premium = int(utilization * 200)  # 0-200 basis points
+    utilization_premium = int(utilization * 200)
     adjusted_apr = base_apr + utilization_premium
-    
-    return {
-        "approved": True,
-        "requested_amount": str(requested_wei),
-        "max_borrow_amount": str(max_borrow),
-        "utilization": f"{utilization * 100:.1f}%",
-        "base_apr": base_apr / 100,
-        "adjusted_apr": adjusted_apr / 100,
-        "utilization_premium": utilization_premium / 100
-    }
+
+    # 8. Agentic reasoning via Gemini
+    reasoning = _get_loan_reasoning(score, request.requested_amount, utilization, adjusted_apr)
+
+    return EvaluateLoanResponse(
+        approved=True,
+        reason=reasoning,
+        requested_amount=str(requested_wei),
+        max_borrow_amount=str(max_borrow),
+        utilization=f"{utilization * 100:.1f}%",
+        base_apr=base_apr / 100,
+        adjusted_apr=adjusted_apr / 100,
+        utilization_premium=utilization_premium / 100,
+        loan_value_usd=loan_value_usd,
+        flr_price_usd=flr_price,
+        xrp_price_usd=xrp_price,
+    )
+
+
+def _get_loan_reasoning(score, requested_tokens, utilization, adjusted_apr_bps):
+    """Use Gemini to produce a human-readable loan approval explanation."""
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        if not Config.GEMINI_API_KEY:
+            return _fallback_reasoning(score, requested_tokens, utilization, adjusted_apr_bps)
+
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=Config.GEMINI_API_KEY,
+            temperature=0.2,
+        )
+
+        messages = [
+            SystemMessage(content=(
+                "You are a DeFi lending advisor. Given the borrower's credit data and loan request, "
+                "write a concise 2-3 sentence approval summary explaining why the loan is approved "
+                "and any relevant notes about the terms. Be professional and factual. "
+                "Return plain text only, no JSON or markdown."
+            )),
+            HumanMessage(content=(
+                f"TradFi score: {score['tradfi_score']}/1000, "
+                f"OnChain score: {score['onchain_score']}/100, "
+                f"Risk score: {score['combined_risk_score']}/100, "
+                f"Requested: {requested_tokens:.0f} tokens, "
+                f"Max allowed: {score['max_borrow_amount'] / 10**18:.0f} tokens, "
+                f"Utilization: {utilization * 100:.1f}%, "
+                f"APR: {adjusted_apr_bps / 100:.2f}%"
+            )),
+        ]
+
+        response = llm.invoke(messages)
+        return response.content.strip()
+
+    except Exception as e:
+        print(f"[EvaluateLoan] Gemini reasoning failed ({e}), using fallback")
+        return _fallback_reasoning(score, requested_tokens, utilization, adjusted_apr_bps)
+
+
+def _fallback_reasoning(score, requested_tokens, utilization, adjusted_apr_bps):
+    """Rule-based fallback reasoning."""
+    risk = score['combined_risk_score']
+    if risk <= 20:
+        tier = "excellent"
+    elif risk <= 40:
+        tier = "good"
+    elif risk <= 60:
+        tier = "fair"
+    else:
+        tier = "elevated"
+
+    return (
+        f"Loan approved. Borrower has {tier} credit profile "
+        f"(risk {risk}/100, TradFi {score['tradfi_score']}/1000, OnChain {score['onchain_score']}/100). "
+        f"Requesting {requested_tokens:.0f} of {score['max_borrow_amount'] / 10**18:.0f} max tokens "
+        f"({utilization * 100:.1f}% utilization) at {adjusted_apr_bps / 100:.2f}% APR."
+    )
 
 # ============================================================================
 # LOAN DISBURSEMENT
@@ -201,81 +242,67 @@ async def evaluate_loan_request(request: CreditScoreRequest):
 @router.post("/disburse-loan")
 async def disburse_loan(request: DisburseRequest):
     """
-    Disburse approved loan to user.
-    WARNING: This should be protected with authentication in production.
+    Disburse loan to user. Self-sufficient — independently re-verifies
+    all conditions at execution time so there is no gap to exploit.
     """
-    
-    # Get user's credit score
-    score = blockchain_service.get_user_score(request.user_address)
-    
-    if not score or score['combined_risk_score'] == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="No credit score found. User must request credit score first."
-        )
-    
-    # Convert tokens to wei
+    address = request.user_address
     requested_wei = int(request.requested_amount * 10**18)
-    max_borrow = score['max_borrow_amount']
-    
+
     if request.requested_amount <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Requested amount must be greater than 0"
-        )
-    
-    if requested_wei > max_borrow:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Requested amount {request.requested_amount} mUSDC exceeds max borrow limit {max_borrow / 10**18} mUSDC"
-        )
-    
-    # Check risk score
+        raise HTTPException(status_code=400, detail="Requested amount must be greater than 0")
+
+    # --- Re-verify everything fresh (no trust from evaluate-loan) ---
+
+    # Active loan check
+    if blockchain_service.check_active_loan(address):
+        raise HTTPException(status_code=400, detail="User already has an active loan")
+
+    # Score must exist
+    score = blockchain_service.get_user_score(address)
+    if not score or score['combined_risk_score'] == 0:
+        raise HTTPException(status_code=404, detail="No credit score found. Run /process-score first.")
+
+    # Risk ceiling
     MAX_ACCEPTABLE_RISK = 70
     if score['combined_risk_score'] > MAX_ACCEPTABLE_RISK:
+        raise HTTPException(status_code=400, detail=f"Credit risk too high: {score['combined_risk_score']}/100")
+
+    # Amount within limit
+    if requested_wei > score['max_borrow_amount']:
         raise HTTPException(
             status_code=400,
-            detail=f"Credit risk too high: {score['combined_risk_score']} (max acceptable: {MAX_ACCEPTABLE_RISK})"
+            detail=f"Amount exceeds max borrow limit of {score['max_borrow_amount'] / 10**18:.0f} tokens"
         )
-    
-    # Check if user already has active loan
-    has_loan = blockchain_service.check_active_loan(request.user_address)
-    if has_loan:
-        raise HTTPException(
-            status_code=400,
-            detail="User already has an active loan"
-        )
-    
+
+    # Pool liquidity
+    pool = blockchain_service.get_pool_balance()
+    if pool and pool['balance_wei'] < requested_wei:
+        raise HTTPException(status_code=400, detail=f"Insufficient pool liquidity")
+
+    # --- All checks passed, disburse ---
     try:
-        result = blockchain_service.disburse_loan(request.user_address, requested_wei)
-        
+        result = blockchain_service.disburse_loan(address, requested_wei)
+
         if result is None:
-            raise HTTPException(
-                status_code=500,
-                detail="Insufficient pool balance"
-            )
-        
+            raise HTTPException(status_code=500, detail="Disbursement failed")
+
         if result['status'] != 1:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Transaction failed on-chain"
-            )
-        
+            raise HTTPException(status_code=500, detail="Transaction failed on-chain")
+
         return {
             "success": True,
             "message": "Loan disbursed successfully",
-            "user_address": request.user_address,
+            "user_address": address,
             "amount_tokens": request.requested_amount,
             "amount_wei": str(requested_wei),
             "tx_hash": result['transactionHash'].hex(),
-            "gas_used": result['gasUsed']
+            "gas_used": result['gasUsed'],
         }
-    
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to disburse loan: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to disburse loan: {str(e)}")
 
 # ============================================================================
 # LOAN STATUS & REPAYMENT
@@ -372,101 +399,4 @@ async def get_repayment_info(user_address: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-@router.post("/prepare-repayment/{user_address}", response_model=PrepareRepaymentResponse)
-async def prepare_repayment(user_address: str):
-    """
-    Prepare unsigned transaction data for loan repayment.
-    User must sign and broadcast these transactions from their wallet.
-    
-    Returns:
-    - Approval transaction (if needed)
-    - Repayment transaction
-    """
-    try:
-        # Get repayment info
-        repayment_info = await get_repayment_info(user_address)
-        
-        if not repayment_info['has_active_loan']:
-            raise HTTPException(
-                status_code=404,
-                detail="No active loan found for this address"
-            )
-        
-        repayment_amount_wei = int(repayment_info['repayment']['total_amount_wei'])
-        needs_approval = repayment_info['user_status']['needs_approval']
-        
-        transactions = []
-        
-        # Step 1: Approval transaction (if needed)
-        if needs_approval:
-            approve_tx = blockchain_service.token.functions.approve(
-                blockchain_service.lending.address,
-                repayment_amount_wei
-            ).build_transaction({
-                'from': user_address,
-                'nonce': blockchain_service.w3.eth.get_transaction_count(user_address),
-                'gas': 100000,
-                'gasPrice': blockchain_service.w3.eth.gas_price,
-                'chainId': 114  # Coston2
-            })
-            
-            transactions.append(TransactionData(
-                step=1,
-                type='approve',
-                description=f'Approve {repayment_amount_wei / 10**18:.2f} mUSDC for repayment',
-                to=blockchain_service.token.address,
-                data=approve_tx['data'],
-                value='0x0',
-                gas=hex(approve_tx['gas']),
-                gasPrice=hex(approve_tx['gasPrice']),
-                nonce=hex(approve_tx['nonce']),
-                chainId='0x72'
-            ))
-        
-        # Step 2: Repayment transaction using repay()
-        repay_nonce = blockchain_service.w3.eth.get_transaction_count(user_address)
-        if needs_approval:
-            repay_nonce += 1  # Increment nonce after approval
-            
-        repay_tx = blockchain_service.lending.functions.repay().build_transaction({
-            'from': user_address,
-            'nonce': repay_nonce,
-            'gas': 300000,
-            'gasPrice': blockchain_service.w3.eth.gas_price,
-            'chainId': 114
-        })
-        
-        transactions.append(TransactionData(
-            step=len(transactions) + 1,
-            type='repay',
-            description=f'Repay loan: {repayment_amount_wei / 10**18:.2f} mUSDC',
-            to=blockchain_service.lending.address,
-            data=repay_tx['data'],
-            value='0x0',
-            gas=hex(repay_tx['gas']),
-            gasPrice=hex(repay_tx['gasPrice']),
-            nonce=hex(repay_tx['nonce']),
-            chainId='0x72'
-        ))
-        
-        return PrepareRepaymentResponse(
-            success=True,
-            message='Transaction data prepared. User must sign and broadcast.',
-            repayment_amount=repayment_amount_wei / 10**18,
-            transactions=transactions,
-            instructions=[
-                'Connect your wallet (MetaMask, WalletConnect, etc.)',
-                'Sign and broadcast these transactions in order:',
-                '1. Approve mUSDC spending (if needed)',
-                '2. Call repay() to complete repayment',
-                'Tokens will be transferred from your wallet to the lending pool'
-            ]
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
