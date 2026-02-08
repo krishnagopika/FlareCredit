@@ -1,77 +1,60 @@
 "use client";
 
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useBalance } from 'wagmi';
-import { useRouter } from 'next/navigation';
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount } from "wagmi";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { motion } from "framer-motion";
+import FlareCreditLogo from "@/components/FlareCreditLogo";
 
-const MUSDC_ADDRESS = "0x45c7B48d002D014D0F8C8dff55045016AD28ACCB"; // replace
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.15, duration: 0.6, ease: "easeOut" as const },
+  }),
+};
 
 export default function Landing() {
-
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const router = useRouter();
 
-  const { data: flareBalance, isLoading: flareLoading } = useBalance({
-    address,
-  });
-
-  const { data: musdcBalance, isLoading: musdcLoading } = useBalance({
-    address,
-    token: MUSDC_ADDRESS,
-  });
+  useEffect(() => {
+    if (isConnected) {
+      router.push("/dashboard");
+    }
+  }, [isConnected, router]);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6">
+    <main className="relative flex min-h-screen flex-col items-center justify-center gap-8 px-4">
+      {/* Hero */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.7, ease: "easeOut" }}
+      >
+        <FlareCreditLogo size="lg" />
+      </motion.div>
 
-      <h1 className="text-5xl font-bold">
-        Flare Credit Oracle
-      </h1>
-
-      <p className="text-xl">
+      <motion.p
+        className="text-lg md:text-xl text-slate-400 text-center max-w-md"
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        custom={1}
+      >
         Unlock lower collateral loans using verifiable credit data.
-      </p>
+      </motion.p>
 
-      <ConnectButton />
-
-      {/* ⭐ Wallet Overview */}
-      {isConnected && (
-        <div className="border rounded-2xl p-6 w-[360px] text-center space-y-2 shadow-sm">
-
-          <p className="text-sm text-gray-500">
-            Wallet Connected
-          </p>
-
-          <p className="font-mono text-xs break-all">
-            {address}
-          </p>
-
-          <div className="pt-3 space-y-1">
-
-            <p>
-              {flareLoading
-                ? "Loading..."
-                : `${Number(flareBalance?.formatted).toFixed(2)} ${flareBalance?.symbol}`}
-            </p>
-
-            <p>
-              {musdcLoading
-                ? "Loading..."
-                : `${Number(musdcBalance?.formatted).toLocaleString()} ${musdcBalance?.symbol}`}
-            </p>
-
-          </div>
-        </div>
-      )}
-
-      {isConnected && (
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="bg-black text-white px-6 py-3 rounded-xl hover:scale-105 transition"
-        >
-          Enter Dashboard →
-        </button>
-      )}
-
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        custom={2}
+      >
+        <ConnectButton />
+      </motion.div>
     </main>
   );
 }
